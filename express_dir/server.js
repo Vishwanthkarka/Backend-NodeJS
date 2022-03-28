@@ -6,7 +6,37 @@ const express = require('express')  // exporting the express function to express
 const app = express() // we use app variable to get the express object
 
 // to extract body of request object 
-app.use(express.json())
+app.use(express.json()) // it is also a middleware  
+// in this body is extracted from the request and it is called as body passer middleware
+
+//Using middleware 
+//To execute middleware for each request 
+// we use app.use(middleware)
+
+const middleware1 =(req,res,next)=> {
+    console.log("middleware-1 executed ")
+
+    //forward request to next 
+    next()// if we don't next then it will stack in the middleware and the response will n't be sended
+}
+//create middleware2
+const middleware2 =(req,res,next)=> {
+    console.log("middleware-2 executed ")
+
+    //forward request to next 
+    next()// if we don't next then it will stack in the middleware and the response will n't be sended
+}
+
+
+//use middleware1 for each request 
+app.use(middleware1) // for every request it will print in the console
+app.use(middleware2) // here two middleware will executes the we get the response  
+// to use the middleware for the specific path the we use
+app.use('/getusers',middleware1)
+
+// to use middleware to executed at specific methods
+//app.htt-method(path,middleware,(req,res)={})
+
 
 //Fake user data
 let users =[
@@ -22,9 +52,9 @@ let users =[
 ]
 
 // create  RestAPI
-app.get('/getusers',(req,res)=> {  // defining the route 
+app.get('/getusers',middleware1,(req,res)=> {  // defining the route 
     res.send({massage:"all users", payload:users}) // sending the response to the browser
-})
+}) // the middleware1 will executed when get request for the get 
 
 // O/P:
 // {
@@ -111,6 +141,15 @@ app.delete('/remove-user/:id',(req,res) => {
     })
 })
 
+app.use((req,res,next)=> { // this is a middleware with out assigning the variable 
+    res.send({message:`path ${req.url} is invalid`})
+}) // if no route executed the this middleware will execute 
+
+
+//error handling middleware
+app.use((err,req,res,next)=> {
+    res.send({message:"An error occurred" , reason:`${err.message}`})
+})
 app.listen(4000,()=> {
     console.log("server is running in the port no 4000") // we had created http server with the express module
 })
