@@ -109,6 +109,7 @@ userApp.post('/create-user',(req,res)=> {
 
 })
 
+
 // create a route  to modify  user data
 userApp.put('/update-user',(req,res)=> {
     //get modified user obj
@@ -136,5 +137,6 @@ userApp.delete('/remove-user/:id',(req,res) => {
         res.send({message:"deleted successfully"})
     })
 })
+
 
 module.exports = userApp
