@@ -1,6 +1,11 @@
 //create router to handle user api reqs
+// importing bcryptjs
+const bcryptjs = require('bcryptjs')
 const express = require('express')
 const userApp  = express.Router() // created min express application
+const expressAsyncHandler = require('express-async-handler') // with this module you don't need to have try and catch block
+// importing jsonwebtoken to create token
+const jwt = require("jsonwebtoken")
 
 userApp.use(express.json()) // it is also a middleware  
 // in this body is extracted from the request and it is called as body passer middleware
@@ -9,87 +14,22 @@ userApp.use(express.json()) // it is also a middleware
 //To execute middleware for each request 
 // we use app.use(middleware)
 
-const middleware1 =(req,res,next)=> {
-    console.log("middleware-1 executed ")
 
-    //forward request to next 
-    next()// if we don't next then it will stack in the middleware and the response will n't be sended
-}
-//create middleware2
-const middleware2 =(req,res,next)=> {
-    console.log("middleware-2 executed ")
-
-    //forward request to next 
-    next()// if we don't next then it will stack in the middleware and the response will n't be sended
-}
-
-
-//use middleware1 for each request 
-userApp.use(middleware1) // for every request it will print in the console
-userApp.use(middleware2) // here two middleware will executes the we get the response  
-// to use the middleware for the specific path the we use
-userApp.use('/getusers',middleware1)
 
 // to use middleware to executed at specific methods
 //app.htt-method(path,middleware,(req,res)={})
 
 
-//Fake user data
-let users =[
-    {id:1,
-    name:'ravi',
-    age:21
-},
-{
-    id: 2,
-    name:"vishwanath",
-    age:19
-}
-]
 
-// create  RestAPI
-userApp.get('/getusers',middleware1,(req,res)=> {  // defining the route 
-    res.send({massage:"all users", payload:users}) // sending the response to the browser
-}) // the middleware1 will executed when get request for the get 
 
-// O/P:
-// {
-//     "massage": "all users",
-//     "payload": [
-//       {
-//         "id": 1,
-//         "name": "ravi",
-//         "age": 21
-//       },
-//       {
-//         "id": 2,
-//         "name": "vishwanath",
-//         "age": 19
-//       }
-//     ]
-//   }
+userApp.get('/getusers',expressAsyncHandler(async(req,res)=> {   //:id is an url parameter
 
-userApp.get('/getusers/:id',(req,res)=> {   //:id is an url parameter
-//get url param
-let userID = (+req.params.id) //{id:123} // (+ ....) it converts string to number
-//O/P:
-//{ id: '1' }
+        const userCollectionObject = req.app.get('userCollectionObject')
+        const userObj = await userCollectionObject.find().toArray()
+        res.send({message:"user"})
+        console.log(userObj)
 
-//search user object
-let userOBJ = users.find(userObj=> userObj.id == userID)
-// if user not found
-console.log(userID)
-//O/P : 2
-console.log(userOBJ) 
-//O/P : { id: 2, name: 'vishwanath', age: 19 }
-if (userOBJ  === undefined){
-    res.send({message:"user not found"})
-}
-//if user found
-else{
-    res.send({message:"user found ", payload:userOBJ})
-}
-})
+}))
 
 //ex: http://localhost:4000/getuser/2 or 3 2 an or 3 are ids => this is called as url argument
 
@@ -98,44 +38,76 @@ else{
 // To create client should send post request (new user resource)
 // while sending request we need to send what kind of the data we are sending we needed to send 
 //***** for POST and PUT request contents the body   */
-userApp.post('/create-user',(req,res)=> {
-    //get user object sent by client 
-    let newUser  = req.body;
-   
-    // push new user to users list 
-    users.push(newUser)
-    //send response
-    res.send({message:"New User  Created "})
+userApp.post('/create-user',expressAsyncHandler(async(req,res)=> {
+    const userCollectionObject = req.app.get('userCollectionObject')
+    let newUserObj = req.body;
+    console.log(newUserObj)
+    let userOfDB = await userCollectionObject.findOne({username:newUserObj.username})
+    // if user exist
+    if(userOfDB !== null){
+res.send({message:"UserName has already taken.. PLZ choose another username"})
 
-})
+    }
+    // if user not existed
+    else{
+        // hashing the password
+let hashedPassword = await bcryptjs.hash(newUserObj.password,6)
+//change the password with hash password 
+newUserObj.password = hashedPassword
+//inserting to the database
+        await userCollectionObject.insertOne(newUserObj)
+        res.send({message:"Created user"})
+    }
+        
+}))
+
+
+
+userApp.post("/login",expressAsyncHandler (async(req,res)=> {
+    const userCollectionObject = req.app.get('userCollectionObject')
+    let userCredObj = req.body
+    let userOfDB = await userCollectionObject.findOne({username:userCredObj.username})
+    // checking the username existed or not
+    if (userOfDB == null){
+        res.send({message:"Invalid user"})
+
+    }
+    // if username exited
+else{
+    // comparing password
+let status = await bcryptjs.compare(userCredObj.password,userOfDB.password)
+//if password not match 
+if(status == false){
+    res.send({message:"Invalid password"})
+}
+// if password matches
+else{
+// create token 
+let token = jwt.sign({username:userOfDB.username},'abcdef',{expiresIn:60})
+//send the token 
+res.send({message:"login success ", payload:token, userObj:userOfDB})
+}
+}
+}))
+
 
 
 // create a route  to modify  user data
-userApp.put('/update-user',(req,res)=> {
+userApp.put('/update-user',expressAsyncHandler(async(req,res)=> {
     //get modified user obj
-    users.map(us=> {
-if (us.id == req.body.id){
-    us.name = req.body.name,
-    us.age = req.body.age
-    console.log(req.body.name)
-}
-// console.log(us)
-// console.log(us.id)
-    })
-    console.log(users)
-    // let modifiedObj= req.body 
-    res.send({message:"Modified"})
-})
+    /// userCollection object
+    const userCollectionObject = req.app.get('userCollectionObject')
+   let  userUpdateObj = req.body
+   let userUpdateOfDB = await userCollectionObject.updateOne({username:userUpdateObj.username},{ $set: {...userUpdateObj}})
+   res.send({message:"update successful "})
+}))
 
 userApp.delete('/remove-user/:id',(req,res) => {
-   let userID = (+req.params.id)
-   console.log(userID)
-    users.forEach((user)=> {
-        if (user.id == userID){
-            delete user
-        }
-        res.send({message:"deleted successfully"})
-    })
+   let userID = req.params.id
+   const userCollectionObject = req.app.get('userCollectionObject')
+   let userDeleteOfOBJ = userCollectionObject.deleteOne({username:userID})
+   res.send({message:"Delete Succussfully"})
+  
 })
 
 
