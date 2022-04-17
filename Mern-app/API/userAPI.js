@@ -8,6 +8,33 @@ const expressAsyncHandler = require('express-async-handler') // with this module
 const jwt = require("jsonwebtoken")
 //import dotenv
 require("dotenv").config()
+var cloudinary = require ('cloudinary').v2;
+const {CloudinaryStorage} = require("multer-storage-cloudinary")
+const multer  = require("multer")
+const path = require('path')
+
+
+cloudinary.config({ 
+    cloud_name: process.env.CLOUD_NAME, 
+    api_key: process.env.API_KEY, 
+    api_secret: process.env.API_SECRET,
+    secure:true
+  });
+
+//config cloudinary storage 
+const cloudinaryStorage = new CloudinaryStorage({
+    cloudinary:cloudinary,
+    params:async (req,file) => {
+        return {
+            folder:"vnr2022",
+            public_id:file.fieldname + "-" + Date.now()
+        };
+    },
+});
+
+//config multer 
+var upload =  multer({storage:cloudinaryStorage})
+
 userApp.use(express.json()) // it is also a middleware  
 // in this body is extracted from the request and it is called as body passer middleware
 
@@ -39,10 +66,19 @@ userApp.get('/getusers',expressAsyncHandler(async(req,res)=> {   //:id is an url
 // To create client should send post request (new user resource)
 // while sending request we need to send what kind of the data we are sending we needed to send 
 //***** for POST and PUT request contents the body   */
-userApp.post('/create-user',expressAsyncHandler(async(req,res)=> {
+userApp.post('/create-user',
+upload.single("photo"),
+expressAsyncHandler(async(req,res)=> {
+/// to print the link of the image
+  //  console.log(req.file.path);
+    // userCollectionObject
     const userCollectionObject = req.app.get('userCollectionObject')
-    let newUserObj = req.body;
-    console.log(newUserObj)
+
+    // get user from client 
+    // converting the string to the javascript object
+    let newUserObj = JSON.parse(req.body.userObj);
+    console.log(newUserObj) 
+    
     let userOfDB = await userCollectionObject.findOne({username:newUserObj.username})
     // if user exist
     if(userOfDB !== null){
@@ -55,7 +91,13 @@ res.send({message:"UserName has already taken"})
 let hashedPassword = await bcryptjs.hash(newUserObj.password,6)
 //change the password with hash password 
 newUserObj.password = hashedPassword
-//inserting to the database
+// adding the profile image link to new UserOBJ
+newUserObj.profileImg = req.file.path
+
+//remove photo property
+delete newUserObj.photo;
+
+//inserting user
         await userCollectionObject.insertOne(newUserObj)
         res.send({message:"New user Created"})
     }
@@ -66,11 +108,15 @@ newUserObj.password = hashedPassword
 
 userApp.post("/login",expressAsyncHandler (async(req,res)=> {
     const userCollectionObject = req.app.get('userCollectionObject')
+    console.log(userCollectionObject)
     let userCredObj = req.body
+    console.log(userCredObj)
     let userOfDB = await userCollectionObject.findOne({username:userCredObj.username})
     // checking the username existed or not
+    console.log(userCredObj.username)
     if (userOfDB == null){
         res.send({message:"Invalid user"})
+        
 
     }
     // if username exited
@@ -86,7 +132,7 @@ else{
 // create token 
 let token = jwt.sign({username:userOfDB.username},process.env.SECREAT_KEY,{expiresIn:60})
 //send the token 
-res.send({message:"login success ", payload:token, userObj:userOfDB})
+res.send({message:"success", payload:token, userObj:userOfDB})
 }
 }
 }))

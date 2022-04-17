@@ -1,15 +1,29 @@
-import React from "react";
+import React,{useEffect} from "react";
 import { Form, Button } from "react-bootstrap";
 import { useForm } from "react-hook-form";
+import {useSelector,useDispatch} from "react-redux"
+import {userLogin} from '../slices/userSlices'
+import { useNavigate } from "react-router-dom";
 function Login() {
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm();
-  const onFormsubmit = (users) => {
-    console.log(users)
+let Dispatch = useDispatch()
+  let {userObj,isError,isLoading,isSuccess,errMsg} = useSelector(state=> state.user)
+  const onFormsubmit = (userCredentialObject) => {
+ Dispatch(userLogin(userCredentialObject))
   }
+//get navigate functon to navigate programatically
+let navigate = useNavigate();
+
+    //this to be executed when either isSuccess or isError changed
+    useEffect(() => {
+      if (isSuccess) {
+        navigate("/userdashboard");
+      }
+    }, [isSuccess, isError]);
   return (
     <div>
       <h1 className="display-2 text-center text-info"> Signup</h1>

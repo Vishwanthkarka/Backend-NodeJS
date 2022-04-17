@@ -1,8 +1,9 @@
-import React from "react";
+import React,{useState} from "react";
 import { Form, Button } from "react-bootstrap";
 import { useForm } from "react-hook-form";
 import {useNavigate} from 'react-router-dom'
 import axios from "axios"
+
 function Signup() {
   const {
     register,
@@ -10,10 +11,25 @@ function Signup() {
     formState: { errors }, 
   } = useForm();
 
+  // state for image
+  let [img,setImg] = useState(null);
+
+  //on image select 
+  const onImageSelect=  (event) => {
+    setImg(event.target.files[0])
+  }
+
 const navigate = useNavigate()
   const onFormsubmit = (userObj) => {
    
-    axios.post('http://localhost:4000/user-api/create-user',userObj)
+    //create FormData object
+    let formData = new FormData()
+
+    // append values to it 
+    formData.append("userObj",JSON.stringify(userObj))
+    formData.append("photo",img);
+
+    axios.post('http://localhost:4000/user-api/create-user',formData)
     .then(res=> {console.log(res)
       alert(res.data.message)
 
@@ -22,6 +38,7 @@ const navigate = useNavigate()
         navigate("/login")
       }
     })
+
 
     .catch(error => {
       console.log(error)
@@ -59,6 +76,11 @@ const navigate = useNavigate()
           <Form.Control type="text" placeholder="city"{...register("city",{required:true})} />
           {errors.city &&<p className="text-danger">*city is required</p>}
         </Form.Group>
+
+        <Form.Group controlId="formFile" className="mb-3">
+    <Form.Label>Select the Image</Form.Label>
+    <Form.Control type="file" {...register("photo",{required:true})} onChange={(event) => onImageSelect(event)} />
+  </Form.Group>
 
         <Button variant="primary" type="submit">
           Submit
